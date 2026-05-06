@@ -36,6 +36,7 @@ function saveRecent(items: RecentEmoji[]) {
 export default function Home() {
   const [query, setQuery] = useState('');
   const [recentUsed, setRecentUsed] = useState<RecentEmoji[]>([]);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     setRecentUsed(loadRecent());
@@ -94,9 +95,52 @@ export default function Home() {
         margin: '40px auto',
         padding: '0 16px',
         fontFamily: 'system-ui, sans-serif',
+        position: 'relative'
       }}
     >
-      <h1 style={{ fontSize: 36, marginBottom: 12 }}>Emoji Search</h1>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12
+      }}>
+        <h1 style={{ fontSize: 36, marginBottom: 12 }}>Emoji Search</h1>
+        <button
+          onClick={() => setShowInfo(!showInfo)}
+          style={{
+            width: 40,
+            height: 40,
+            border: 'none',
+            background: '#f0f0f0',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            color: '#666',
+            fontSize: 18,
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.8,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#e5e5e5';
+            e.currentTarget.style.opacity = '1';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f0f0f0';
+            e.currentTarget.style.opacity = '0.8';
+            e.currentTarget.style.transform = '';
+          }}
+          title="About (⌘+?)"
+        >
+          ℹ
+        </button>
+      </div>
+      
+      
       <p style={{ color: '#666', marginBottom: 24 }}>
         Search emojis and keep track of your recently used ones.
       </p>
@@ -316,6 +360,79 @@ export default function Home() {
           </div>
         )}
       </section>
+      
+      {showInfo && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setShowInfo(false)}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: 16,
+              padding: '32px 40px',
+              maxWidth: 500,
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowInfo(false)}
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                width: 32,
+                height: 32,
+                border: 'none',
+                background: 'none',
+                fontSize: 20,
+                color: '#999',
+                cursor: 'pointer',
+                borderRadius: '50%',
+              }}
+            >
+              ✕
+            </button>
+            
+            <h2 style={{ fontSize: 24, marginBottom: 16, color: '#333' }}>
+              Welcome to self-hosted EMoogle! 🚀
+            </h2>
+            
+            <div style={{ lineHeight: 1.6, color: '#555' }}>
+              <p><strong>Fast emoji search</strong> powered by <a href="https://github.com/xitanggg/emoogle-emoji-search-engine" target="_blank" style={{ color: '#0070f3' }}>emoogle-emoji-search-engine</a>.</p>
+              <br />
+              <p><strong>Features:</strong></p>
+              <ul style={{ margin: '12px 0', paddingLeft: 24 }}>
+                <li>Instant search-as-you-type</li>
+                <li>Recently used history (localStorage)</li>
+                <li>Click to copy emoji</li>
+                <li>Clear buttons for quick reset</li>
+              </ul>
+              <br />
+              <p style={{ fontSize: 14, opacity: 0.8 }}>
+                Built with Next.js • Deployed on LXC • Made by KarelWintersky
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
     </main>
   );
 }
