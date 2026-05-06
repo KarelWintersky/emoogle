@@ -1,0 +1,22 @@
+[Unit]
+Description=Emoji Search Site (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=emojiapp
+Group=emojiapp
+WorkingDirectory=/opt/emoji-search-site
+Environment="NODE_ENV=production"
+Environment="NEXT_TELEMETRY_DISABLED=1"
+ExecStart=/usr/bin/node --max-old-space-size=4096 /opt/emoji-search-site/.next/standalone/server.js
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=3
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=emoji-search
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

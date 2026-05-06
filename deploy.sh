@@ -51,6 +51,7 @@ User=emojiapp
 Group=emojiapp
 WorkingDirectory=/opt/emoji-search-site
 Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
 ExecStart=/usr/bin/node --max-old-space-size=4096 /opt/emoji-search-site/.next/standalone/server.js
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
