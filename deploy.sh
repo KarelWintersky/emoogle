@@ -23,25 +23,20 @@ sudo chown emojiapp:emojiapp /opt/emoji-search-site
 # 4) Клонирование и сборка
 sudo -u emojiapp bash -c "
   cd /opt/emoji-search-site
-  git init
-  git remote add origin https://github.com/KarelWintersky/emoogle.git
-  git fetch origin main
-  git checkout main
-  git pull origin main
-"
-
-# Если нет GitHub-репо, создай проект локально:
-sudo -u emojiapp bash -c "
-  cd /opt/emoji-search-site
-  npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias '@/*'
-  npm install emoogle-emoji-search-engine
+  rm -rf .git *
+  git clone https://github.com/KarelWintersky/emoogle.git .
+  npm install
 "
 
 # 5) Сборка для продакшена
 sudo -u emojiapp bash -c "
   cd /opt/emoji-search-site
-  npm ci --only=production
   npm run build
+  rm -rf .next/standalone/.next/static .next/standalone/public
+  ln -s ../../../.next/static .next/standalone/.next/static
+  ln -s ../../public .next/standalone/public 2>/dev/null || true
+  npm prune --production
+  rm -rf .next/cache
 "
 
 # 6) Создание systemd-сервиса
@@ -78,7 +73,13 @@ sudo systemctl start emoji-search.service
 sudo systemctl status emoji-search.service --no-pager
 sudo ss -tulpn | grep :3000
 
+SERVER_IP=$(ip a s | grep -oP '(?<=inet\s)\d+(\.\d+){3}(?=/)' | grep -v 127.0.0.1 | head -1)
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP="localhost"
+fi
+
 echo "✅ Deploy completed!"
-echo "📡 Service listens on localhost:3000"
-echo "🔍 Logs: journalctl -u emoji-search.service -f"
+echo "📡 Service listens on http://${SERVER_IP}:3000"
 echo "🔄 Restart: systemctl restart emoji-search.service"
+echo "🔍 Logs: journalctl -u emoji-search.service -f"
+echo ""
