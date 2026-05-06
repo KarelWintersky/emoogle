@@ -1,58 +1,192 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "🚀 Deploying Emoji Search Site on Node.js 25 + systemd..."
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# 1) Обновление системы
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl wget git build-essential
+PACKAGE_URL="https://github.com/KarelWintersky/emoji-finder/releases/"
+PACKAGE_NAME=$(basename "$PACKAGE_URL")
+PROJECT_ROOT=/opt/emoji-search-site
 
-# 2) Node.js 25 через Nodesource
-curl -fsSL https://deb.nodesource.com/setup_25.x | sudo -E bash -
-sudo apt install -y nodejs
+# Функция для вывода информационных сообщений
+log_info() {
+    echo -e "${BLUE}ℹ️${NC} $1"
+}
 
-# Проверка версии
-node --version
-npm --version
+# Функция для вывода успешных сообщений
+log_success() {
+    echo -e "${GREEN}✅${NC} $1"
+}
 
-# 3) Создание пользователя для приложения
-sudo useradd -m -s /bin/bash emojiapp || true
-sudo mkdir -p /opt/emoji-search-site
-sudo chown emojiapp:emojiapp /opt/emoji-search-site
+# Функция для вывода предупреждений
+log_warning() {
+    echo -e "${YELLOW}⚠️${NC} $1"
+}
 
-# 4) Клонирование и сборка
-sudo -u emojiapp bash -c "
-  cd /opt/emoji-search-site
-  rm -rf .git *
-  git clone https://github.com/KarelWintersky/emoogle.git .
-  npm install
-"
+# Функция для вывода ошибок
+log_error() {
+    echo -e "${RED}❌${NC} $1"
+}
 
-# 5) Сборка для продакшена
-sudo -u emojiapp bash -c "
-  cd /opt/emoji-search-site
-  npm run build
-  rm -rf .next/standalone/.next/static .next/standalone/public
-  ln -s ../../../.next/static .next/standalone/.next/static
-  ln -s ../../public .next/standalone/public 2>/dev/null || true
-  npm prune --production
-  rm -rf .next/cache
-"
+# Функция проверки последней команды
+check_status() {
+    if [ $? -eq 0 ]; then
+        log_success "$1"
+    else
+        log_error "$2"
+        exit 1
+    fi
+}
 
-# 6) Создание systemd-сервиса
-sudo tee /etc/systemd/system/emoji-search.service > /dev/null <<EOF
+# Not supported now
+download_and_install_package() {
+    local TEMP_DIR="/tmp/emoji-deploy-$$"
+
+    echo "📦 Attempting to download required package from:"
+    echo "   $PACKAGE_URL"
+
+    # Создаем временную директорию
+    mkdir -p "$TEMP_DIR"
+    cd "$TEMP_DIR"
+
+    # Скачиваем пакет
+    if wget -q --show-progress "$PACKAGE_URL" -O "$PACKAGE_NAME"; then
+        echo "✅ Package downloaded successfully"
+
+        # Устанавливаем пакет
+        echo "💾 Installing package with dpkg..."
+        if sudo dpkg -i "$PACKAGE_NAME"; then
+            echo "✅ Package installed successfully"
+        else
+            echo "❌ Failed to install package"
+            echo "💡 Attempting to fix dependencies..."
+            sudo apt-get install -f -y
+            if [ $? -eq 0 ]; then
+                echo "✅ Dependencies fixed, package should be installed"
+            else
+                echo "❌ Could not resolve dependencies"
+                echo "⚠️  Continuing deployment, but performance may be unstable"
+            fi
+        fi
+    else
+        echo "❌ Failed to download package from: $PACKAGE_URL"
+        echo "⚠️  Continuing without the package - performance may be impacted"
+    fi
+
+    # Очистка
+    cd /
+    rm -rf "$TEMP_DIR"
+
+    # Даем пользователю время прочитать сообщение
+    sleep 3
+}
+
+check_requirements() {
+    local total_ram_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    local total_ram_mb=$((total_ram_kb / 1024))
+
+    echo "🔍 Checking system requirements..."
+    echo "📊 Total RAM detected: ${total_ram_mb} MB"
+    if [ $total_ram_mb -lt 1024 ]; then
+        echo "⚠️  WARNING: Insufficient RAM (${total_ram_mb} MB < 1024 MB)"
+        echo "   This application requires at least 1 GB of RAM."
+
+#        echo "Do you want to install it via dpkg? (y/n)"
+#        read -r answer
+#        if [[ "$answer" =~ ^[Yy]$ ]]; then
+#            download_and_install_package
+#        else
+#            echo "❌ Installation cancelled. Cannot proceed without sufficient RAM."
+#            exit 1
+#        fi
+        exit 1
+    else
+        echo "✅ System meets minimum RAM requirements (${total_ram_mb} MB >= 1024 MB)"
+    fi
+}
+
+# Функция обновления системы
+update_system() {
+    log_info "Обновление системы..."
+    sudo apt update && sudo apt upgrade -y
+    check_status "Система обновлена" "Ошибка при обновлении системы"
+
+    log_info "Установка необходимых пакетов..."
+    sudo apt install -y curl wget git build-essential
+    check_status "Пакеты установлены" "Ошибка при установке пакетов"
+}
+
+# Функция установки Node.js 25
+install_nodejs() {
+    log_info "Установка Node.js 25 через Nodesource..."
+    curl -fsSL https://deb.nodesource.com/setup_25.x | sudo -E bash -
+    check_status "Репозиторий Nodesource добавлен" "Ошибка при добавлении репозитория Nodesource"
+
+    sudo apt install -y nodejs
+    check_status "Node.js установлен" "Ошибка при установке Node.js"
+
+    log_info "Версия Node.js: $(node --version)"
+    log_info "Версия npm: $(npm --version)"
+}
+
+# Функция создания пользователя и директорий
+create_user_and_directories() {
+    log_info "Создание пользователя emojiapp..."
+    sudo useradd -m -s /bin/bash emojiapp || true
+    check_status "Пользователь создан" "Ошибка при создании пользователя"
+
+    log_info "Создание директории $(PROJECT_ROOT)..."
+    sudo mkdir -p ${PROJECT_ROOT}
+    sudo chown emojiapp:emojiapp ${PROJECT_ROOT}
+    check_status "Директория создана" "Ошибка при создании директории"
+}
+
+# Функция клонирования репозитория и установки зависимостей
+clone_and_install() {
+    log_info "Клонирование репозитория и установка зависимостей..."
+    sudo -u emojiapp bash -c "
+        cd ${PROJECT_ROOT}
+        rm -rf .git *
+        git clone https://github.com/KarelWintersky/emoogle.git .
+        npm install
+    "
+    check_status "Репозиторий склонирован и зависимости установлены" \
+                 "Ошибка при клонировании или установке зависимостей"
+}
+
+# Функция сборки для продакшена
+build_production() {
+    log_info "Сборка проекта для продакшена..."
+    sudo -u emojiapp bash -c "
+        cd ${PROJECT_ROOT}
+        npm run build
+        rm -rf .next/standalone/.next/static .next/standalone/public
+        ln -s ../../../.next/static .next/standalone/.next/static
+        ln -s ../../public .next/standalone/public 2>/dev/null || true
+        npm prune --production
+        rm -rf .next/cache
+    "
+    check_status "Сборка завершена успешно" "Ошибка при сборке проекта"
+}
+
+create_systemd_service() {
+    log_info "Создание systemd сервиса..."
+    sudo tee ${PROJECT_ROOT}/emoji-search.service > /dev/null <<EOF
 [Unit]
-Description=Emoji Search Site (Next.js)
+Description=Emoji Search Site
 After=network.target
 
 [Service]
 Type=simple
 User=emojiapp
 Group=emojiapp
-WorkingDirectory=/opt/emoji-search-site
+WorkingDirectory=${PROJECT_ROOT}
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
-ExecStart=/usr/bin/node --max-old-space-size=4096 /opt/emoji-search-site/.next/standalone/server.js
+ExecStart=/usr/bin/node --max-old-space-size=4096 ${PROJECT_ROOT}/.next/standalone/server.js
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=3
@@ -64,24 +198,107 @@ LimitNOFILE=65535
 [Install]
 WantedBy=multi-user.target
 EOF
+    check_status "systemd сервис создан" "Ошибка при создании systemd сервиса"
 
-# 7) Перезапуск systemd и запуск сервиса
-sudo systemctl daemon-reload
-sudo systemctl enable emoji-search.service
-sudo systemctl start emoji-search.service
+    # Создаём симлинк в systemd директорию
+    sudo ln -sf ${PROJECT_ROOT}/emoji-search.service /etc/systemd/system/emoji-search.service
+    check_status "Симлинк создан в /etc/systemd/system/" "Ошибка при создании симлинка"
+}
 
-# 8) Проверка статуса
-sudo systemctl status emoji-search.service --no-pager
-sudo ss -tulpn | grep :3000
+# Функция запуска и включения сервиса
+start_and_enable_service() {
+    log_info "Перезагрузка systemd и запуск сервиса..."
+    sudo systemctl daemon-reload
+    check_status "systemd перезагружен" "Ошибка при перезагрузке systemd"
 
-SERVER_IP=$(ip a s | grep -oP '(?<=inet\s)\d+(\.\d+){3}(?=/)' | grep -v 127.0.0.1 | head -1)
-if [ -z "$SERVER_IP" ]; then
-    SERVER_IP="localhost"
-fi
+    sudo systemctl enable emoji-search.service
+    check_status "Сервис добавлен в автозагрузку" "Ошибка при добавлении в автозагрузку"
 
-echo "✅ Deploy completed!"
-echo "📡 Service listens on http://${SERVER_IP}:3000"
-echo "🔄 Restart: systemctl restart emoji-search.service"
-echo ""
-echo "🔍 Logs: journalctl -u emoji-search.service -f"
-echo ""
+    sudo systemctl start emoji-search.service
+    check_status "Сервис запущен" "Ошибка при запуске сервиса"
+}
+
+# Функция проверки статуса сервиса
+check_service_status() {
+    log_info "Проверка статуса сервиса..."
+    sleep 3 # Даем время сервису запуститься
+
+    if sudo systemctl is-active --quiet emoji-search.service; then
+        log_success "Сервис активен и работает"
+        sudo systemctl status emoji-search.service --no-pager -l
+    else
+        log_error "Сервис не активен"
+        sudo systemctl status emoji-search.service --no-pager -l
+        log_warning "Логи сервиса:"
+        sudo journalctl -u emoji-search.service -n 20 --no-pager
+        exit 1
+    fi
+}
+
+# Функция проверки порта
+check_port() {
+    log_info "Проверка порта 3000..."
+    if sudo ss -tulpn | grep -q ":3000"; then
+        log_success "Порт 3000 прослушивается"
+        sudo ss -tulpn | grep :3000
+    else
+        log_warning "Порт 3000 не прослушивается"
+    fi
+}
+
+# Функция получения IP адреса
+get_server_ip() {
+    local SERVER_IP=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1)
+
+    if [ -z "$SERVER_IP" ]; then
+        SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "localhost")
+    fi
+
+    echo "$SERVER_IP"
+}
+
+# Функция вывода информации о завершении
+print_completion_info() {
+    local SERVER_IP=$(get_server_ip)
+
+    echo ""
+    echo "========================================="
+    log_success "✅ Deploy completed!"
+    echo "========================================="
+    echo ""
+    log_info "🌐 Service listens on: ${GREEN}http://${SERVER_IP}:3000${NC}"
+    echo ""
+    log_info "📋 Useful commands:"
+    echo "   Check service status:    ${YELLOW}sudo systemctl status emoji-search.service${NC}"
+    echo "   Restart service:         ${YELLOW}sudo systemctl restart emoji-search.service${NC}"
+    echo "   Stop service:            ${YELLOW}sudo systemctl stop emoji-search.service${NC}"
+    echo ""
+    echo "   View systemd logs:       ${YELLOW}journalctl -u emoji-search.service -f${NC}"
+    echo "   View last 100 log lines: ${YELLOW}journalctl -u emoji-search.service -n 100 --no-pager${NC}"
+    echo ""
+}
+
+uninstall {
+    systemctl stop emoji-search.service
+    systemctl disable emoji-search.service
+
+}
+
+main() {
+    echo "🚀 Deploying Emoji Search Site on Node.js 25 + systemd..."
+    echo "=========================================================="
+    echo ""
+
+    update_system
+    install_nodejs
+    create_user_and_directories
+    clone_and_install
+    build_production
+    create_systemd_service
+    start_and_enable_service
+    check_port
+    print_completion_info
+}
+
+main
+
