@@ -47,21 +47,45 @@ export default function Home() {
     return searchEmojis(q, 400);
   }, [query]);
 
-  const handlePickEmoji = (emoji: string) => {
-    setRecentUsed((prev) => {
-      const map = new Map<string, number>();
-      for (const item of prev) map.set(item.emoji, item.count);
-      map.set(emoji, (map.get(emoji) ?? 0) + 1);
+    const handlePickEmoji = async (emoji: string) => {
+        // 1) Обновляем recent used
+        setRecentUsed((prev) => {
+            const map = new Map<string, number>();
+            for (const item of prev) map.set(item.emoji, item.count);
+            map.set(emoji, (map.get(emoji) ?? 0) + 1);
 
-      const next = Array.from(map.entries())
-        .map(([emoji, count]) => ({ emoji, count }))
-        .sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji))
-        .slice(0, 50);
+            const next = Array.from(map.entries())
+                .map(([emoji, count]) => ({ emoji, count }))
+                .sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji))
+                .slice(0, 50);
 
-      saveRecent(next);
-      return next;
-    });
-  };
+            saveRecent(next);
+            return next;
+        });
+
+        // 2) Копируем в буфер
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(emoji);
+            } else {
+                // Fallback для HTTP / старых браузеров
+                const textArea = document.createElement('textarea');
+                textArea.value = emoji;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+            }
+        } catch (err) {
+            console.error('Copy failed:', err);
+            // Последний резерв: alert
+            navigator.clipboard?.writeText(emoji) || alert(`Copied: ${emoji}`);
+        }
+    };
 
   return (
     <main
@@ -119,16 +143,25 @@ export default function Home() {
                   key={emoji}
                   onClick={() => handlePickEmoji(emoji)}
                   style={{
-                    height: 72,
-                    border: '1px solid #eee',
-                    borderRadius: 14,
-                    background: 'white',
-                    cursor: 'pointer',
-                    fontSize: 28,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxSizing: 'border-box',
+                      height: 72,
+                      border: '1px solid #eee',
+                      borderRadius: 14,
+                      background: 'white',
+                      cursor: 'pointer',
+                      fontSize: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxSizing: 'border-box',
+                      transition: 'all 0.1s',
+                  }}
+                  onMouseDown={(e) => {
+                      e.currentTarget.style.transform = 'scale(0.98)';
+                      e.currentTarget.style.background = '#f0f0f0';
+                  }}
+                  onMouseUp={(e) => {
+                      e.currentTarget.style.transform = '';
+                      e.currentTarget.style.background = 'white';
                   }}
                   title="Click to use"
                 >
