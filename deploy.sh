@@ -82,5 +82,6 @@ fi
 echo "✅ Deploy completed!"
 echo "📡 Service listens on http://${SERVER_IP}:3000"
 echo "🔄 Restart: systemctl restart emoji-search.service"
+echo ""
 echo "🔍 Logs: journalctl -u emoji-search.service -f"
 echo ""
