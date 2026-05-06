@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 
 PACKAGE_URL="https://github.com/KarelWintersky/emoji-finder/releases/"
 PACKAGE_NAME=$(basename "$PACKAGE_URL")
-PROJECT_ROOT=/opt/emoji-search-site
+PACKAGE_ROOT=/opt/emoji-search-site
 
 # Функция для вывода информационных сообщений
 log_info() {
@@ -138,9 +138,9 @@ create_user_and_directories() {
     sudo useradd -m -s /bin/bash emojiapp || true
     check_status "Пользователь создан" "Ошибка при создании пользователя"
 
-    log_info "Создание директории $(PROJECT_ROOT)..."
-    sudo mkdir -p ${PROJECT_ROOT}
-    sudo chown emojiapp:emojiapp ${PROJECT_ROOT}
+    log_info "Создание директории $(PACKAGE_ROOT)..."
+    sudo mkdir -p ${PACKAGE_ROOT}
+    sudo chown emojiapp:emojiapp ${PACKAGE_ROOT}
     check_status "Директория создана" "Ошибка при создании директории"
 }
 
@@ -148,7 +148,7 @@ create_user_and_directories() {
 clone_and_install() {
     log_info "Клонирование репозитория и установка зависимостей..."
     sudo -u emojiapp bash -c "
-        cd ${PROJECT_ROOT}
+        cd ${PACKAGE_ROOT}
         rm -rf .git *
         git clone https://github.com/KarelWintersky/emoogle.git .
         npm install
@@ -161,7 +161,7 @@ clone_and_install() {
 build_production() {
     log_info "Сборка проекта для продакшена..."
     sudo -u emojiapp bash -c "
-        cd ${PROJECT_ROOT}
+        cd ${PACKAGE_ROOT}
         npm run build
         rm -rf .next/standalone/.next/static .next/standalone/public
         ln -s ../../../.next/static .next/standalone/.next/static
@@ -174,7 +174,7 @@ build_production() {
 
 create_systemd_service() {
     log_info "Создание systemd сервиса..."
-    sudo tee ${PROJECT_ROOT}/emoji-search.service > /dev/null <<EOF
+    sudo tee ${PACKAGE_ROOT}/emoji-search.service > /dev/null <<EOF
 [Unit]
 Description=Emoji Search Site
 After=network.target
@@ -183,10 +183,10 @@ After=network.target
 Type=simple
 User=emojiapp
 Group=emojiapp
-WorkingDirectory=${PROJECT_ROOT}
+WorkingDirectory=${PACKAGE_ROOT}
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
-ExecStart=/usr/bin/node --max-old-space-size=4096 ${PROJECT_ROOT}/.next/standalone/server.js
+ExecStart=/usr/bin/node --max-old-space-size=4096 ${PACKAGE_ROOT}/.next/standalone/server.js
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=3
@@ -201,7 +201,7 @@ EOF
     check_status "systemd сервис создан" "Ошибка при создании systemd сервиса"
 
     # Создаём симлинк в systemd директорию
-    sudo ln -sf ${PROJECT_ROOT}/emoji-search.service /etc/systemd/system/emoji-search.service
+    sudo ln -sf ${PACKAGE_ROOT}/emoji-search.service /etc/systemd/system/emoji-search.service
     check_status "Симлинк создан в /etc/systemd/system/" "Ошибка при создании симлинка"
 }
 
@@ -278,13 +278,15 @@ print_completion_info() {
     echo ""
 }
 
-uninstall {
+uninstall() {
     systemctl stop emoji-search.service
     systemctl disable emoji-search.service
-
+    rm /etc/systemd/system/emoji-search.service
+    rm -rf ${PACKAGE_ROOT}
 }
 
-main() {
+
+install() {
     echo "🚀 Deploying Emoji Search Site on Node.js 25 + systemd..."
     echo "=========================================================="
     echo ""
@@ -300,5 +302,125 @@ main() {
     print_completion_info
 }
 
-main
+# Функция переустановки
+reinstall() {
+    log_warning "Переустановка приложения..."
+    uninstall
+    install
+}
+
+# Функция обновления (без переустановки)
+update() {
+    log_info "Обновление приложения..."
+
+    if [ ! -d "${PACKAGE_ROOT}/.git" ]; then
+        log_error "Приложение не установлено. Сначала выполните установку."
+        exit 1
+    fi
+
+    update_code
+    build_production
+    restart_service
+    check_port
+    print_completion_info
+}
+
+# Функция удаления
+uninstall() {
+    log_warning "Удаление приложения..."
+
+    # Останавливаем и отключаем сервис
+    if systemctl is-active --quiet emoji-search.service 2>/dev/null; then
+        sudo systemctl stop emoji-search.service
+        log_success "Сервис остановлен"
+    fi
+
+    if systemctl is-enabled --quiet emoji-search.service 2>/dev/null; then
+        sudo systemctl disable emoji-search.service
+        log_success "Сервис отключен из автозагрузки"
+    fi
+
+    # Удаляем файлы сервиса
+    sudo rm -f /etc/systemd/system/emoji-search.service
+    sudo systemctl daemon-reload
+    log_success "Файлы сервиса удалены"
+
+    # Удаляем директорию приложения
+    if [ -d "${PACKAGE_ROOT}" ]; then
+        sudo rm -rf ${PACKAGE_ROOT}
+        log_success "Директория приложения удалена"
+    fi
+
+    # Опционально: удаляем пользователя
+    if id "emojiapp" &>/dev/null; then
+        log_warning "Пользователь emojiapp не был удален (можно удалить вручную: sudo userdel emojiapp)"
+    fi
+
+    log_success "Приложение полностью удалено"
+}
+
+# Функция отображения меню
+show_menu() {
+    clear
+    echo "========================================="
+    echo "   🚀 Emoji Search Site Deployment Tool"
+    echo "========================================="
+    echo ""
+    echo "Выберите действие:"
+    echo ""
+    echo "  1) Install / Reinstall - Полная установка или переустановка"
+    echo "  2) Update - Обновление кода и пересборка"
+    echo "  3) Remove - Полное удаление приложения"
+    echo "  4) Exit - Выход"
+    echo ""
+    echo "========================================="
+    echo -n "Ваш выбор [1-4]: "
+    read -r choice
+
+    case $choice in
+        1)
+            echo ""
+            if [ -d "${PACKAGE_ROOT}" ] && [ -f "/etc/systemd/system/emoji-search.service" ]; then
+                echo "⚠️  Приложение уже установлено."
+                echo -n "Вы хотите выполнить переустановку? (y/n): "
+                read -r confirm
+                if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                    reinstall
+                else
+                    log_info "Операция отменена"
+                    exit 0
+                fi
+            else
+                install
+            fi
+            ;;
+        2)
+            update
+            ;;
+        3)
+            echo ""
+            echo "⚠️  ВНИМАНИЕ: Это действие полностью удалит приложение и все его данные!"
+            echo -n "Вы уверены, что хотите продолжить? (y/n): "
+            read -r confirm
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                uninstall
+            else
+                log_info "Операция отменена"
+                exit 0
+            fi
+            ;;
+        4)
+            log_info "Выход из программы"
+            exit 0
+            ;;
+        *)
+            log_error "Неверный выбор. Пожалуйста, выберите 1, 2, 3 или 4"
+            exit 1
+            ;;
+    esac
+}
+
+# Запуск меню
+
+show_menu
 
