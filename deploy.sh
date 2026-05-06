@@ -191,6 +191,7 @@ Group=emojiapp
 WorkingDirectory=${PACKAGE_ROOT}
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
+Environment="HOST=0.0.0.0"
 ExecStart=/usr/bin/node --max-old-space-size=4096 ${PACKAGE_ROOT}/.next/standalone/server.js
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
@@ -281,6 +282,20 @@ print_completion_info() {
     echo -e "   View systemd logs:       ${YELLOW}journalctl -u emoji-search.service -f${NC}"
     echo -e "   View last 100 log lines: ${YELLOW}journalctl -u emoji-search.service -n 100 --no-pager${NC}"
     echo ""
+}
+
+# Функция обновления кода из репозитория
+# Функция обновления кода из репозитория
+update_code() {
+    log_info "Обновление кода из репозитория..."
+
+    sudo -u emojiapp bash -c "
+        cd ${PACKAGE_ROOT}
+        git fetch origin
+        git reset --hard origin/\$(git branch --show-current)
+    "
+
+    check_status "Код обновлен из репозитория" "Ошибка при обновлении кода"
 }
 
 install() {
