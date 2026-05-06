@@ -212,10 +212,20 @@ export default function Home() {
         </div>
       </section>
 
-      <section style={{ marginTop: 32, "border-top": "1px solid black" }}>
+      <section style={{ marginTop: 32, borderTop: "1px solid black", paddingTop: "10px" }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <h2 style={{ fontSize: 20, marginBottom: 12 }}>Recently used</h2>
+          <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',  // ← Крестик справа
+              marginBottom: 16
+          }}>
+              <h2 style={{
+                  fontSize: 20,
+                  margin: 0,
+                  fontWeight: 600
+              }}>Recently used</h2>
+
               {recentUsed.length > 0 && (
                   <button
                       onClick={() => {
@@ -231,7 +241,7 @@ export default function Home() {
                           color: '#666',
                           fontSize: 18,
                           fontWeight: 'bold',
-                          borderRadius: "50%",
+                          borderRadius: '50%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -249,11 +259,12 @@ export default function Home() {
                           e.currentTarget.style.opacity = '0.8';
                           e.currentTarget.style.transform = '';
                       }}
-                      title="Clear recently used"
+                      title="Clear recently used (⌘+Shift+R)"
                   >
                       ✕
                   </button>
               )}
+
           </div>
 
 
