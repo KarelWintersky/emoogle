@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Deploy script for https://github.com/KarelWintersky/emoogle
+#
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -6,10 +9,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+RESET='\033[0m' # No Color
 
 PACKAGE_URL="https://github.com/KarelWintersky/emoji-finder/releases/"
 PACKAGE_NAME=$(basename "$PACKAGE_URL")
-PACKAGE_ROOT=/opt/emoji-search-site
+PACKAGE_ROOT="/opt/emoji-search-site"
 
 # Функция для вывода информационных сообщений
 log_info() {
@@ -138,7 +142,7 @@ create_user_and_directories() {
     sudo useradd -m -s /bin/bash emojiapp || true
     check_status "Пользователь создан" "Ошибка при создании пользователя"
 
-    log_info "Создание директории $(PACKAGE_ROOT)..."
+    log_info "Создание директории ${PACKAGE_ROOT}..."
     sudo mkdir -p ${PACKAGE_ROOT}
     sudo chown emojiapp:emojiapp ${PACKAGE_ROOT}
     check_status "Директория создана" "Ошибка при создании директории"
@@ -168,6 +172,7 @@ build_production() {
         ln -s ../../public .next/standalone/public 2>/dev/null || true
         npm prune --production
         rm -rf .next/cache
+        rm -rf node_modules
     "
     check_status "Сборка завершена успешно" "Ошибка при сборке проекта"
 }
@@ -269,22 +274,14 @@ print_completion_info() {
     log_info "🌐 Service listens on: ${GREEN}http://${SERVER_IP}:3000${NC}"
     echo ""
     log_info "📋 Useful commands:"
-    echo "   Check service status:    ${YELLOW}sudo systemctl status emoji-search.service${NC}"
-    echo "   Restart service:         ${YELLOW}sudo systemctl restart emoji-search.service${NC}"
-    echo "   Stop service:            ${YELLOW}sudo systemctl stop emoji-search.service${NC}"
-    echo ""
-    echo "   View systemd logs:       ${YELLOW}journalctl -u emoji-search.service -f${NC}"
-    echo "   View last 100 log lines: ${YELLOW}journalctl -u emoji-search.service -n 100 --no-pager${NC}"
+    echo -e "   Check service status:    ${YELLOW}sudo systemctl status emoji-search.service${NC}"
+    echo -e "   Restart service:         ${YELLOW}sudo systemctl restart emoji-search.service${NC}"
+    echo -e "   Stop service:            ${YELLOW}sudo systemctl stop emoji-search.service${NC}"
+    echo -e ""
+    echo -e "   View systemd logs:       ${YELLOW}journalctl -u emoji-search.service -f${NC}"
+    echo -e "   View last 100 log lines: ${YELLOW}journalctl -u emoji-search.service -n 100 --no-pager${NC}"
     echo ""
 }
-
-uninstall() {
-    systemctl stop emoji-search.service
-    systemctl disable emoji-search.service
-    rm /etc/systemd/system/emoji-search.service
-    rm -rf ${PACKAGE_ROOT}
-}
-
 
 install() {
     echo "🚀 Deploying Emoji Search Site on Node.js 25 + systemd..."
@@ -353,6 +350,7 @@ uninstall() {
 
     # Опционально: удаляем пользователя
     if id "emojiapp" &>/dev/null; then
+        userdel emojiapp
         log_warning "Пользователь emojiapp не был удален (можно удалить вручную: sudo userdel emojiapp)"
     fi
 
@@ -363,7 +361,7 @@ uninstall() {
 show_menu() {
     clear
     echo "========================================="
-    echo "   🚀 Emoji Search Site Deployment Tool"
+    echo "   🚀 ${GREEN}Emoji Search Site Deployment Tool${RESET}"
     echo "========================================="
     echo ""
     echo "Выберите действие:"
