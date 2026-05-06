@@ -101,22 +101,61 @@ export default function Home() {
         Search emojis and keep track of your recently used ones.
       </p>
 
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Try: amazing, happy, fire..."
-        style={{
-          width: '100%',
-          padding: '14px 16px',
-          fontSize: 18,
-          border: '1px solid #ddd',
-          borderRadius: 12,
-          outline: 'none',
-          boxSizing: 'border-box',
-        }}
-      />
+        <div style={{ position: 'relative' }}>
+            <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Try: amazing, happy, fire..."
+                style={{
+                    width: '100%',
+                    padding: '14px 40px 14px 16px',
+                    fontSize: 18,
+                    border: '1px solid #ddd',
+                    borderRadius: 12,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                }}
+            />
+            {query && (
+                <button
+                    onClick={() => setQuery('')}
+                    style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 42,
+                        height: 42,
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        color: '#666',
+                        fontSize: 28,
+                        lineHeight: 1,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0.7,
+                        transition: 'all 0.2s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f0f0f0';
+                        e.currentTarget.style.opacity = '1';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'none';
+                        e.currentTarget.style.opacity = '0.7';
+                    }}
+                    title="Clear search"
+                >
+                    ×
+                </button>
+            )}
+        </div>
 
-      <section style={{ marginTop: 24 }}>
+      <section style={{ marginTop: 32 }}>
         <h2 style={{ fontSize: 20, marginBottom: 12 }}>Results</h2>
 
         <div
@@ -173,8 +212,52 @@ export default function Home() {
         </div>
       </section>
 
-      <section style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 20, marginBottom: 12 }}>Recently used</h2>
+      <section style={{ marginTop: 32, "border-top": "1px solid black" }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <h2 style={{ fontSize: 20, marginBottom: 12 }}>Recently used</h2>
+              {recentUsed.length > 0 && (
+                  <button
+                      onClick={() => {
+                          setRecentUsed([]);
+                          saveRecent([]);
+                      }}
+                      style={{
+                          width: 28,
+                          height: 28,
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          color: '#666',
+                          fontSize: 18,
+                          fontWeight: 'bold',
+                          borderRadius: "50%",
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: 0.8,
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      }}
+                      onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#f5f5f5';
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.transform = 'scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'none';
+                          e.currentTarget.style.opacity = '0.8';
+                          e.currentTarget.style.transform = '';
+                      }}
+                      title="Clear recently used"
+                  >
+                      ✕
+                  </button>
+              )}
+          </div>
+
+
+
 
         {recentUsed.length === 0 ? (
           <p style={{ color: '#888' }}>No recently used emojis yet.</p>
